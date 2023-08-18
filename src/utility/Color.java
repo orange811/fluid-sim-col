@@ -18,8 +18,13 @@ public class Color {
 	public static final Color yellowish = toColor(0xFDB813);
 	public static final Color unhit = new Color(-1, -1, -1);
 	public static final int maxInt = 0xFFFFFF;
+	
+	@Override
+	public String toString() {
+		return "Color[r:"+r+",g:"+g+",b:"+b+"]";
+	}
 
-	public static Color mapClamp(Color col, float minFin, float maxFin, float minInit, float maxInit, float minClamp,
+	public static Color mapClamp(final Color col, float minFin, float maxFin, float minInit, float maxInit, float minClamp,
 			float maxClamp) {
 		Color c = new Color(col);
 		c = new Color(minFin, minFin, minFin).add(

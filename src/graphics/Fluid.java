@@ -34,7 +34,7 @@ public class Fluid extends JPanel {
 	int upResFac = 1;
 	float halfSize = drawSize / 2f;
 	static final int iter = 4;
-	static final int steps = 1;
+	static final int brushSize = 5;
 	float ms = 8;
 
 	Vec2 mOld = Vec2.inv;
@@ -67,114 +67,142 @@ public class Fluid extends JPanel {
 	Color[][] newS;
 
 	public Fluid(int sz, int drawS, float visc, float diff, float ticksPerSec, float fadeVal, boolean fullscreen) {
-		this.size = sz;
-		this.drawSize = drawS;
-		this.visc = visc;
-		this.diff = diff;
-		this.fullscreen = fullscreen;
-		this.halfSize = drawSize / 2f;
-		this.tps = ticksPerSec;
-		this.fade = fadeVal;
-		iObs = new ImageObserver() {
-			public boolean imageUpdate(Image img, int infoflags, int x, int y, int width, int height) {
-				return false;
-			}
-		};
-		addIntensity = 600f;
-		drawW = drawH = (size - 2 * crop) * drawS;
-		img = new BufferedImage(drawW, drawH, BufferedImage.TYPE_INT_RGB);
-		v = new Vec2[size][size];
-		s = new Color[size][size];
-		newV = new Vec2[size][size];
-		newS = new Color[size][size];
-		for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-//				v[i][j] = new Vec2((float) Math.random() * drawSize - halfSize,
-//						(float) Math.random() * drawSize - halfSize);
-				v[i][j] = Vec2.zero;
-				newV[i][j] = v[i][j];
-//				if (i < j)
-//					s[i][j] = new Color((float) Math.random(), (float) Math.random(), (float) Math.random());
-//				else
-				s[i][j] = Color.black;
-				newS[i][j] = s[i][j];
-			}
-		}
-		setBackground(bg.toAwt());
-		setForeground(fg.toAwt());
-		jf.setBackground(bg.toAwt());
-		jf.add(this);
-		jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		if (fullscreen)
-			jf.setExtendedState(JFrame.MAXIMIZED_BOTH);
-		else
-			jf.setSize(drawW, drawH);
-//		System.out.println(jf.getSize());
-		jf.setUndecorated(true);
+	    // Initialize parameters based on input arguments
+	    this.size = sz;
+	    this.drawSize = drawS;
+	    this.visc = visc;
+	    this.diff = diff;
+	    this.fullscreen = fullscreen;
+	    this.halfSize = drawSize / 2f;
+	    this.tps = ticksPerSec;
+	    this.fade = fadeVal;
 
-		jf.setBackground(getBackground());
-		jf.setVisible(true);
+	    // Create an ImageObserver to be used for images (not used in this code)
+	    iObs = new ImageObserver() {
+	        public boolean imageUpdate(Image img, int infoflags, int x, int y, int width, int height) {
+	            return false;
+	        }
+	    };
 
-		jf.addKeyListener(new KeyAdapter() {
-			public void keyPressed(KeyEvent k) {
-				if (k.getKeyCode() == KeyEvent.VK_ESCAPE) {
-					running = false;
-				}
-				if (k.getKeyCode() == KeyEvent.VK_SPACE) {
-					vectorView = !vectorView;
-				}
-				if (k.getKeyCode() == KeyEvent.VK_C) {
-					changeCol = true;
-				}
-			}
-		});
+	    // Initialize addIntensity
+	    addIntensity = 50000f;
+
+	    // Calculate the dimensions of the drawing area
+	    drawW = drawH = (size - 1 * crop) * drawS;
+
+	    // Create a BufferedImage to store the rendered image
+	    img = new BufferedImage(drawW, drawH, BufferedImage.TYPE_INT_RGB);
+
+	    // Initialize velocity and color arrays
+	    v = new Vec2[size][size];
+	    s = new Color[size][size];
+	    newV = new Vec2[size][size];
+	    newS = new Color[size][size];
+	    for (int i = 0; i < size; i++) {
+	        for (int j = 0; j < size; j++) {
+	            v[i][j] = Vec2.zero;
+	            newV[i][j] = v[i][j];
+	            s[i][j] = Color.black;
+	            newS[i][j] = s[i][j];
+	        }
+	    }
+
+	    // Set background and foreground colors for the JPanel
+	    setBackground(bg.toAwt());
+	    setForeground(fg.toAwt());
+
+	    // Create the JFrame for displaying the simulation
+	    jf.setBackground(bg.toAwt());
+	    jf.add(this);
+	    jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	    
+	    // Set JFrame size based on fullscreen preference
+	    if (fullscreen)
+	        jf.setExtendedState(JFrame.MAXIMIZED_BOTH);
+	    else
+	        jf.setSize(drawW, drawH);
+
+	    // Set JFrame properties
+	    jf.setUndecorated(true);
+	    jf.setBackground(getBackground());
+	    jf.setVisible(true);
+
+	    // Add keyboard listener for user interactions
+	    jf.addKeyListener(new KeyAdapter() {
+	        public void keyPressed(KeyEvent k) {
+	            // Exit the simulation on ESC key
+	            if (k.getKeyCode() == KeyEvent.VK_ESCAPE) {
+	                running = false;
+	            }
+	            // Toggle vector view on SPACE key
+	            if (k.getKeyCode() == KeyEvent.VK_SPACE) {
+	                vectorView = !vectorView;
+	            }
+	            // Trigger color change on C key
+	            if (k.getKeyCode() == KeyEvent.VK_C) {
+	                changeCol = true;
+	            }
+	        }
+	    });
 
 		jf.addMouseMotionListener(new MouseMotionAdapter() {
+			//LINE BASED IMPLEMENTATION
 			public void mouseDragged(MouseEvent m) {
-				Point loc = m.getPoint();
-				mNew = new Vec2(loc.x * 1f / drawSize + crop, loc.y * 1f / drawSize + crop);
-				float yDiff = mNew.y - mOld.y, xDiff = mNew.x - mOld.x, slope = yDiff / xDiff, slopeRec = xDiff / yDiff;
-				boolean[][] through = new boolean[(int) Math.abs(yDiff) + 2][(int) Math.abs(xDiff) + 2];
-				int yMin = Math.min((int) mOld.y, (int) mNew.y), xMin = Math.min((int) mOld.x, (int) mNew.x),
-						xMax = Math.max((int) mOld.x, (int) mNew.x), yMax = Math.max((int) mOld.y, (int) mNew.y);
-				Vec2 vel = new Vec2(xDiff, yDiff).multiply(vAddScale);
-				if (!mOld.equals(Vec2.inv) && (xMin > 1) && (yMin > 1) && (yMax < size - 1) && (xMax < size - 1)) {
-					for (int i = yMin; i < yMax; i++) {
-						int x = (int) (slopeRec * (i - mOld.y) + mOld.x);
-						for (int k = i - yMin; k <= i + 2 - yMin; k++) {
-							for (int l = x - xMin; l <= x + 2 - xMin; l++) {
-								if (k > 0 && k < through.length && l > 0 && l < through[0].length)
-									through[k][l] = true;
-							}
-						}
-					}
-					for (int j = xMin; j < xMax; j++) {
-						int y = (int) (slope * (j - mOld.x) + mOld.y);
-						for (int k = (j - xMin); k <= j + 1 - xMin; k++)
-							for (int l = y - yMin; l <= y + 1 - yMin; l++)
-								if (k > 0 && k < through.length && l > 0 && l < through[0].length)
-									through[k][l] = true;
-					}
-					for (int i = -1; i < through.length - 1; i++) {
-						for (int j = -1; j < through[0].length - 1; j++) {
-							if (through[i + 1][j + 1]) {
-								addDye((int) maths.clamp(1, xMin + j, size - 2),
-										(int) maths.clamp(1, yMin + i, size - 2), dyeCol.multiply(addIntensity));
-								addVel((int) maths.clamp(1, xMin + j, size - 2),
-										(int) maths.clamp(1, yMin + i, size - 2), vel);
-							}
-						}
-					}
+			    // Retrieve current mouse position and convert to array coordinates
+			    Point loc = m.getPoint();
+			    Vec2 mNew = new Vec2(loc.x * 1f / drawSize + crop, loc.y * 1f / drawSize + crop);
+			    Vec2 diff = mNew.sub(mOld);
+			    
+			    // Extract integer coordinates of old and new positions
+			    int x0 = (int) mOld.x;
+			    int y0 = (int) mOld.y;
+			    int x1 = (int) mNew.x;
+			    int y1 = (int) mNew.y;
 
-					s = diffCol(s, s);
-				}
-				mOld = mNew;
+			    // Calculate absolute differences in x and y coordinates
+			    int dx = Math.abs(x1 - x0);
+			    int dy = Math.abs(y1 - y0);
+
+			    // Determine direction of the line (left or right, up or down)
+			    int sx = x0 < x1 ? 1 : -1;
+			    int sy = y0 < y1 ? 1 : -1;
+
+			    // Initialize error term
+			    int err = dx - dy;
+
+			    // Iterate over the points along the line
+			    while (x0 >= 0 && x0 < size && y0 >= 0 && y0 < size) {
+			        // Add dye and velocity to the current position in the arrays
+			        addDye(x0, y0, dyeCol.multiply(addIntensity));
+			        addVel(x0, y0, diff.multiply(vAddScale));
+
+			        // Check if the current position matches the destination position
+			        if (x0 == x1 && y0 == y1) {
+			            break;
+			        }
+
+			        // Update error term based on Bresenham's algorithm
+			        int e2 = 2 * err;
+			        if (e2 > -dy) {
+			            err -= dy;
+			            x0 += sx;
+			        }
+			        if (e2 < dx) {
+			            err += dx;
+			            y0 += sy;
+			        }
+			    }
+
+			    // Update the color array based on the difference calculation
+			    s = diffCol(s, s);
+			    
+			    // Update the previous mouse position for the next iteration
+			    mOld = mNew;
 			}
-
 		});
-
+		
+		// Add mouse listener to reset mouse position
 		jf.addMouseListener(new MouseAdapter() {
-
 			public void mouseReleased(MouseEvent m) {
 				mOld = Vec2.inv;
 			}
@@ -190,252 +218,345 @@ public class Fluid extends JPanel {
 		v[y][x] = v[y][x].add(vel);
 	}
 
+	// Fading method to simulate decay and energy loss
 	void fade() {
-		for (int i = 0; i < (size); i++) {
-			for (int j = 0; j < (size); j++) {
-				float cFade = -fade / tps * ms, vFade = fade / tps * ms * drawSize * vAddScale / addIntensity;
-				float vX = v[i][j].x, vY = v[i][j].y;
-				Color c = s[i][j];
-				if (vX != 0) {
-					if (Math.abs(vX) > vFade)
-						vX = vX > 0 ? vX - vFade : vX + vFade;
-					else
-						vX = 0;
-					v[i][j].x = vX;
-				}
-				if (vY != 0) {
-					if (Math.abs(vY) > vFade)
-						vY = vY > 0 ? vY - vFade : vY + vFade;
-					else
-						vY = 0;
-					v[i][j].y = vY;
-				}
-				if (!c.equals(Color.black)) {
-					c = c.add(new Color(cFade, cFade, cFade));
-					c = Color.clamp(0, c, 1);
-					s[i][j] = c;
-				}
-			}
-		}
+	    // Iterate over each grid cell
+	    for (int i = 0; i < (size); i++) {
+	        for (int j = 0; j < (size); j++) {
+	            // Calculate fading and damping factors
+	            float cFade = -fade / tps * ms;
+	            float vFade = fade / tps * ms * drawSize * vAddScale / addIntensity;
+
+	            // Extract current velocity components
+	            float vX = v[i][j].x, vY = v[i][j].y;
+
+	            // Extract current color
+	            Color c = s[i][j];
+
+	            // Apply damping to velocity components
+	            if (vX != 0) {
+	                if (Math.abs(vX) > vFade)
+	                    vX -= Math.signum(vX) * vFade;
+	                else
+	                    vX = 0;
+	                v[i][j].x = vX;
+	            }
+	            if (vY != 0) {
+	                if (Math.abs(vY) > vFade)
+	                    vY -= Math.signum(vY) * vFade;
+	                else
+	                    vY = 0;
+	                v[i][j].y = vY;
+	            }
+
+	            // Apply fading to color
+	            if (!c.equals(Color.black)) {
+	                c = c.add(new Color(cFade, cFade, cFade));
+	                c = Color.clamp(0, c, 1);
+	                s[i][j] = c;
+	            }
+	        }
+	    }
 	}
 
+	// Method to set boundary conditions for a scalar field
 	float[][] setBnd(float[][] fl) {
-		for (int i = 1; i < size - 1; i++) {
-			fl[i][0] = fl[i][1];
-			fl[i][size - 1] = fl[i][size - 2];
-		}
-		for (int j = 1; j < size - 1; j++) {
-			fl[0][j] = fl[1][j];
-			fl[size - 1][j] = fl[size - 2][j];
-		}
+	    // Set boundary values for the left and right edges
+	    for (int i = 1; i < size - 1; i++) {
+	        fl[i][0] = fl[i][1];
+	        fl[i][size - 1] = fl[i][size - 2];
+	    }
+	    
+	    // Set boundary values for the top and bottom edges
+	    for (int j = 1; j < size - 1; j++) {
+	        fl[0][j] = fl[1][j];
+	        fl[size - 1][j] = fl[size - 2][j];
+	    }
 
-		fl[0][0] = 0.5f * (fl[0][1] + fl[1][0]);
-		fl[0][size - 1] = 0.5f * (fl[0][size - 2] + fl[1][size - 1]);
-		fl[size - 1][0] = 0.5f * (fl[size - 2][0] + fl[size - 1][1]);
-		fl[size - 1][size - 1] = 0.5f * (fl[size - 2][size - 1] + fl[size - 1][size - 2]);
-		return fl;
+	    // Set corner values by averaging adjacent values
+	    fl[0][0] = 0.5f * (fl[0][1] + fl[1][0]);
+	    fl[0][size - 1] = 0.5f * (fl[0][size - 2] + fl[1][size - 1]);
+	    fl[size - 1][0] = 0.5f * (fl[size - 2][0] + fl[size - 1][1]);
+	    fl[size - 1][size - 1] = 0.5f * (fl[size - 2][size - 1] + fl[size - 1][size - 2]);
+	    
+	    return fl;
 	}
 
 	Color[][] setBndCol(Color[][] col) {
-		Color x, y;
+	    Color x, y;
 
-		for (int i = 1; i < size - 1; i++) {
-			col[i][0] = col[i][1];
-			col[i][size - 1] = col[i][size - 2];
-		}
-		for (int j = 1; j < size - 1; j++) {
-			col[0][j] = col[1][j];
-			col[size - 1][j] = col[size - 2][j];
-		}
+	    // Set boundary values for top and bottom rows (excluding corners)
+	    for (int i = 1; i < size - 1; i++) {
+	        col[i][0] = col[i][1];
+	        col[i][size - 1] = col[i][size - 2];
+	    }
+	    
+	    // Set boundary values for left and right columns (excluding corners)
+	    for (int j = 1; j < size - 1; j++) {
+	        col[0][j] = col[1][j];
+	        col[size - 1][j] = col[size - 2][j];
+	    }
 
-		col[0][0] = col[0][1].avg(col[1][0]);
-		col[0][size - 1] = col[0][size - 2].avg(col[1][size - 1]);
-		col[size - 1][0] = col[size - 2][0].avg(col[size - 1][1]);
-		col[size - 1][size - 1] = col[size - 2][size - 1].avg(col[size - 1][size - 2]);
+	    // Set boundary values for the corners
+	    col[0][0] = col[0][1].avg(col[1][0]);
+	    col[0][size - 1] = col[0][size - 2].avg(col[1][size - 1]);
+	    col[size - 1][0] = col[size - 2][0].avg(col[size - 1][1]);
+	    col[size - 1][size - 1] = col[size - 2][size - 1].avg(col[size - 1][size - 2]);
 
-//		for (int i = 1; i < size - 1; i++) {
-//			x = col[i][1].avg(col[i][size - 2]);
-//			col[i][0] = x;
-//			col[i][size - 1] = x;
-//		}
-//		for (int j = 1; j < size - 1; j++) {
-//			y = col[1][j].avg(col[size - 2][j]);
-//			col[size - 2][j] = y;
-//			col[1][j] = y;
-//		}
-
-		return col;
+	    return col;
 	}
 
 	Vec2[][] setBndVec(Vec2[][] vec) {
-		Vec2 y, x;
-		for (int i = 0; i < size; i++) {
-			vec[i][0] = Vec2.zero;
-			vec[i][size - 1] = Vec2.zero;
-		}
-		for (int j = 0; j < size; j++) {
-			vec[0][j] = Vec2.zero;
-			vec[size - 1][j] = Vec2.zero;
-		}
-		for (int i = 1; i < size - 1; i++) {
-			x = vec[i][1].avg(vec[i][size - 2]);
-			vec[i][1] = x;
-			vec[i][size - 2] = x;
-		}
-		for (int j = 0; j < size; j++) {
-			y = vec[1][j].avg(vec[size - 2][j]);
-			vec[1][j] = y;
-			vec[size - 2][j] = y;
-		}
-		return vec;
+	    // Set boundary values for top and bottom rows
+	    for (int i = 0; i < size; i++) {
+	        vec[i][0] = vec[i][1].multiply(-1);
+	        vec[i][size - 1] = vec[i][size - 2].multiply(-1);
+	    }
+	    
+	    // Set boundary values for left and right columns (excluding corners)
+	    for (int j = 0; j < size; j++) {
+	        vec[0][j] = vec[1][j].multiply(-1);
+	        vec[size - 1][j] = vec[size - 2][j].multiply(-1);
+	    }
+	    
+	    // Set boundary values for the corners
+	    vec[0][0] = vec[1][1].multiply(-1);
+	    vec[0][size - 1] = vec[1][size - 2].multiply(-1);
+	    vec[size - 1][0] = vec[size - 2][1].multiply(-1);
+	    vec[size - 1][size - 1] = vec[size - 2][size - 2].multiply(-1);
+	    
+	    return vec;
 	}
 
+	// Method to solve linear equations for color fields
 	Color[][] linSolveCol(float a, float c, Color[][] newCol, Color[][] oldCol) {
-		float cRec = 1f / c;
-		for (int k = 0; k < iter; k++) {
-			for (int i = 1; i < (size - 1); i++) {
-				for (int j = 1; j < (size - 1); j++) {
-					Color sum = newCol[i + 1][j].add(newCol[i - 1][j]).add(newCol[i][j - 1]).add(newCol[i][j + 1]);
-					newCol[i][j] = (oldCol[i][j].add(sum.multiply(a))).multiply(cRec);
-				}
-			}
-		}
-		return newCol;
+	    // Calculate the reciprocal of coefficient c
+	    float cRec = 1f / c;
+	    
+	    // Iterate over the field multiple times for convergence
+	    for (int k = 0; k < iter; k++) {
+	        for (int i = 1; i < (size - 1); i++) {
+	            for (int j = 1; j < (size - 1); j++) {
+	                // Calculate the sum of neighboring colors
+	                Color sum = newCol[i + 1][j].add(newCol[i - 1][j]).add(newCol[i][j - 1]).add(newCol[i][j + 1]);
+	                
+	                // Calculate the new color value based on the old value and the sum
+	                newCol[i][j] = (oldCol[i][j].add(sum.multiply(a))).multiply(cRec);
+	            }
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the new color field
+	    newCol = setBndCol(newCol);
+	    
+	    return newCol;
 	}
 
+	// Method to solve linear equations for scalar fields
 	float[][] linSolve(float a, float c, float[][] newFloat, float[][] oldFloat) {
-		float cRec = 1f / c;
-		for (int k = 0; k < iter; k++) {
-			for (int i = 1; i < (size - 1); i++) {
-				for (int j = 1; j < (size - 1); j++) {
-					float sum = newFloat[i + 1][j] + (newFloat[i - 1][j]) + (newFloat[i][j - 1]) + (newFloat[i][j + 1]);
-					newFloat[i][j] = (oldFloat[i][j] + (a * sum)) * cRec;
-				}
-			}
-		}
-		return newFloat;
+	    // Calculate the reciprocal of coefficient c
+	    float cRec = 1f / c;
+	    
+	    // Iterate over the field multiple times for convergence
+	    for (int k = 0; k < iter; k++) {
+	        for (int i = 1; i < (size - 1); i++) {
+	            for (int j = 1; j < (size - 1); j++) {
+	                // Calculate the sum of neighboring values
+	                float sum = newFloat[i + 1][j] + (newFloat[i - 1][j]) + (newFloat[i][j - 1]) + (newFloat[i][j + 1]);
+	                
+	                // Calculate the new value based on the old value, the sum, and coefficient a
+	                newFloat[i][j] = (oldFloat[i][j] + (a * sum)) * cRec;
+	            }
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the new scalar field
+	    newFloat = setBnd(newFloat);
+	    
+	    return newFloat;
 	}
 
+	// Method to diffuse color fields (simulating diffusion of color)
 	Color[][] diffCol(Color[][] newCol, Color[][] oldCol) {
-		float a = ms * diff * (size - 2) * (size - 2);
-		float c = (1 + 4 * a);
-		newCol = linSolveCol(a, c, newCol, oldCol);
-		newCol = setBndCol(newCol);
-		return newCol;
+	    // Calculate the diffusion coefficient 'a' based on time step and grid size
+	    float a = ms * diff * (size - 2) * (size - 2);
+	    
+	    // Calculate the coefficient 'c' used in linear solving
+	    float c = (1 + 4 * a);
+	    
+	    // Solve linear equations for diffusion multiple times for convergence
+	    newCol = linSolveCol(a, c, newCol, oldCol);
+	    
+	    // Apply boundary conditions to the new color field
+	    newCol = setBndCol(newCol);
+	    
+	    return newCol;
 	}
 
+
+	// Method to solve linear equations for vector fields
 	Vec2[][] linSolveVec(float a, float c, Vec2[][] newVec, Vec2[][] oldVec) {
-		float cRec = 1f / c;
-		for (int k = 0; k < iter; k++) {
-			for (int i = 1; i < (size - 1); i++) {
-				for (int j = 1; j < (size - 1); j++) {
-					Vec2 sum = newVec[i + 1][j].add(newVec[i - 1][j]).add(newVec[i][j + 1]).add(newVec[i][j - 1]);
-					newVec[i][j] = (oldVec[i][j].add(sum.multiply(a))).multiply(cRec);
-				}
-			}
-		}
-		return newVec;
+	    // Calculate the reciprocal of coefficient c
+	    float cRec = 1f / c;
+	    
+	    // Iterate over the field multiple times for convergence
+	    for (int k = 0; k < iter; k++) {
+	        for (int i = 1; i < (size - 1); i++) {
+	            for (int j = 1; j < (size - 1); j++) {
+	                // Calculate the sum of neighboring vectors
+	                Vec2 sum = newVec[i + 1][j].add(newVec[i - 1][j]).add(newVec[i][j + 1]).add(newVec[i][j - 1]);
+	                
+	                // Calculate the new vector value based on the old value, the sum, and coefficient a
+	                newVec[i][j] = (oldVec[i][j].add(sum.multiply(a))).multiply(cRec);
+	            }
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the new vector field
+	    newVec = setBndVec(newVec);
+	    
+	    return newVec;
 	}
 
+	// Method to diffuse vector fields (simulating diffusion of velocity)
 	Vec2[][] diffVec(Vec2[][] newVec, Vec2[][] oldVec) {
-		float a = ms * diff * (size - 2) * (size - 2);
-		float c = (1 + 4 * a);
-		newVec = linSolveVec(a, c, newVec, oldVec);
-//		newVec = setBndVec(newVec);
-		return newVec;
-
+	    // Calculate the diffusion coefficient 'a' based on time step and grid size
+	    float a = ms * diff * (size - 2) * (size - 2);
+	    
+	    // Calculate the coefficient 'c' used in linear solving
+	    float c = (1 + 4 * a);
+	    
+	    // Solve linear equations for diffusion multiple times for convergence
+	    newVec = linSolveVec(a, c, newVec, oldVec);
+	    
+	    // Apply boundary conditions to the new vector field
+	    newVec = setBndVec(newVec);
+	    
+	    return newVec;
 	}
 
+	// Method to project the velocity field to ensure incompressibility
 	Vec2[][] project(Vec2[][] vec) {
-		float[][] p = new float[size][size], div = new float[size][size];
-		for (int i = 1; i < size - 1; i++) {
-			for (int j = 1; j < size - 1; j++) {
-				div[i][j] = -0.5f * (vec[i + 1][j].y - vec[i - 1][j].y + vec[i][j + 1].x - vec[i][j - 1].x) / size;
-				p[i][j] = 0;
-			}
-		}
-		p = setBnd(p);
-		div = setBnd(div);
-		p = linSolve(1, 6, p, div);
-
-		for (int i = 1; i < size - 1; i++) {
-			for (int j = 1; j < size - 1; j++) {
-				vec[i][j] = vec[i][j]
-						.sub(new Vec2(p[i][j + 1] - p[i][j - 1], p[i + 1][j] - p[i - 1][j]).multiply(0.5f * size));
-			}
-		}
-//		setBndVec(vec);
-		return vec;
+	    // Initialize arrays for pressure and divergence
+	    float[][] p = new float[size][size];
+	    float[][] div = new float[size][size];
+	    
+	    // Calculate divergence of the velocity field
+	    for (int i = 1; i < size - 1; i++) {
+	        for (int j = 1; j < size - 1; j++) {
+	            // Calculate the divergence using central differences
+	            div[i][j] = -0.5f * (vec[i + 1][j].y - vec[i - 1][j].y + vec[i][j + 1].x - vec[i][j - 1].x) / size;
+	            p[i][j] = 0; // Initialize pressure to zero
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the divergence field
+	    div = setBnd(div);
+	    
+	    // Solve the pressure field to ensure incompressibility
+	    p = linSolve(1, 6, p, div);
+	    
+	    // Update the velocity field based on the pressure field
+	    for (int i = 1; i < size - 1; i++) {
+	        for (int j = 1; j < size - 1; j++) {
+	            // Update the velocity by subtracting the gradient of pressure
+	            vec[i][j] = vec[i][j]
+	                    .sub(new Vec2(p[i][j + 1] - p[i][j - 1], p[i + 1][j] - p[i - 1][j]).multiply(0.5f * size));
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the updated velocity field
+	    vec = setBndVec(vec);
+	    
+	    return vec;
 	}
 
+	// Method to advect vector fields based on velocity
 	Vec2[][] advectVec(Vec2[][] oldVec, Vec2[][] newVec) {
-		Vec2 pos;
-		int x0, y0, x1, y1;
-		float xFromRight, xFromLeft, yFromTop, yFromBottom;// from top and from bottom misnomer because y axis go down
-		for (int i = 1; i < size - 1; i++) {
-			for (int j = 1; j < size - 1; j++) {
-				pos = new Vec2(j, i).sub((newVec[i][j]));
-				pos = Vec2.clamp(0.1f, pos, size - 1.1f);
-				x0 = (int) pos.x;
-				y0 = (int) pos.y;
-				x1 = x0 + 1;
-				y1 = y0 + 1;
-				xFromLeft = pos.x - x0;
-				xFromRight = 1f - xFromLeft;
-				yFromBottom = pos.y - y0;
-				yFromTop = 1f - yFromBottom;
-//				float xVel = xFromRight * (yFromTop * newVec[y0][x0].x + yFromBottom * newVec[y1][x0].x)
-//						+ xFromLeft * (yFromTop * newVec[y0][x1].x + yFromBottom * newVec[y1][x1].x);
-//				float yVel = xFromRight* (yFromTop * newVec[y0][x0].y + yFromBottom * newVec[y1][x0].y)
-//						+ xFromLeft* (yFromTop * newVec[y0][x1].y + yFromBottom * newVec[y1][x1].y);
-				Vec2 velocity = (newVec[y0][x0].multiply(yFromTop).add(newVec[y1][x0].multiply(yFromBottom)))
-						.multiply(xFromRight)
-						.add((newVec[y0][x1].multiply(yFromTop).add(newVec[y1][x1].multiply(yFromBottom)))
-								.multiply(xFromLeft));
-				oldVec[i][j] = velocity;
-			}
-		}
-//		setBndVec(oldVec);
-		return oldVec;
+	    Vec2 pos;
+	    int x0, y0, x1, y1;
+	    float xFromRight, xFromLeft, yFromTop, yFromBottom;
+	    
+	    // Iterate over the grid to advect vector fields
+	    for (int i = 1; i < size - 1; i++) {
+	        for (int j = 1; j < size - 1; j++) {
+	            // Calculate the position based on the velocity
+	            pos = new Vec2(j, i).sub((newVec[i][j]));
+	            pos = Vec2.clamp(0.1f, pos, size - 1.1f);
+	            
+	            // Calculate integer coordinates and factors for interpolation
+	            x0 = (int) pos.x;
+	            y0 = (int) pos.y;
+	            x1 = x0 + 1;
+	            y1 = y0 + 1;
+	            xFromLeft = pos.x - x0;
+	            xFromRight = 1f - xFromLeft;
+	            yFromBottom = pos.y - y0;
+	            yFromTop = 1f - yFromBottom;
+
+	            // Perform bilinear interpolation to advect vector
+	            Vec2 velocity = (newVec[y0][x0].multiply(yFromTop).add(newVec[y1][x0].multiply(yFromBottom)))
+	                    .multiply(xFromRight)
+	                    .add((newVec[y0][x1].multiply(yFromTop).add(newVec[y1][x1].multiply(yFromBottom)))
+	                            .multiply(xFromLeft));
+	            
+	            // Update the vector field with the advected vector
+	            oldVec[i][j] = velocity;
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the advected vector field
+	    oldVec = setBndVec(oldVec);
+	    
+	    return oldVec;
 	}
 
-	Color[][] advectCol(Vec2[][] vec, Color[][] oldCol, Color[][] newCol) {
-		Vec2 pos;
-		int x0, y0, x1, y1;
-		float xFromRight, xFromLeft, yFromTop, yFromBottom;// from top and from bottom misnomer because y axis go down
-		for (int i = 1; i < size - 1; i++) {
-			for (int j = 1; j < size - 1; j++) {
-				pos = new Vec2(j, i).sub((vec[i][j]));
-				pos = Vec2.clamp(0.1f, pos, size - 1.1f);
-				x0 = (int) pos.x;
-				y0 = (int) pos.y;
-				x1 = x0 + 1;
-				y1 = y0 + 1;
-				xFromLeft = pos.x - x0;
-				xFromRight = 1f - xFromLeft;
-				yFromBottom = pos.y - y0;
-				yFromTop = 1f - yFromBottom;
-//				float rNew = xFromLeft * (yFromBottom * newCol[y0][x0].r + yFromTop * newCol[y1][x0].r)
-//						+ xFromRight * (yFromBottom * newCol[y0][x1].r + yFromTop * newCol[y1][x1].r);
-//				float gNew = xFromLeft * (yFromBottom * newCol[y0][x0].g + yFromTop * newCol[y1][x0].g)
-//						+ xFromRight * (yFromBottom * newCol[y0][x1].g + yFromTop * newCol[y1][x1].g);
-//				float bNew = xFromLeft * (yFromBottom * newCol[y0][x0].b + yFromTop * newCol[y1][x0].b)
-//						+ xFromRight * (yFromBottom * newCol[y0][x1].b + yFromTop * newCol[y1][x1].b);
-				// this is wrong don't try using
 
-				Color color = (newCol[y0][x0].multiply(yFromTop).add(newCol[y1][x0].multiply(yFromBottom)))
-						.multiply(xFromRight)
-						.add((newCol[y0][x1].multiply(yFromTop).add(newCol[y1][x1].multiply(yFromBottom)))
-								.multiply(xFromLeft));
-				oldCol[i][j] = color;
-			}
-		}
-		setBndCol(oldCol);
-		return oldCol;
+	// Method to advect color fields based on velocity
+	Color[][] advectCol(Vec2[][] vec, Color[][] oldCol, Color[][] newCol) {
+	    Vec2 pos;
+	    int x0, y0, x1, y1;
+	    float xFromRight, xFromLeft, yFromTop, yFromBottom;
+	    
+	    // Iterate over the grid to advect color fields
+	    for (int i = 1; i < size - 1; i++) {
+	        for (int j = 1; j < size - 1; j++) {
+	            // Calculate the position based on the velocity
+	            pos = new Vec2(j, i).sub((vec[i][j]));
+	            pos = Vec2.clamp(0.1f, pos, size - 1.1f);
+	            
+	            // Calculate integer coordinates and factors for interpolation
+	            x0 = (int) pos.x;
+	            y0 = (int) pos.y;
+	            x1 = x0 + 1;
+	            y1 = y0 + 1;
+	            xFromLeft = pos.x - x0;
+	            xFromRight = 1f - xFromLeft;
+	            yFromBottom = pos.y - y0;
+	            yFromTop = 1f - yFromBottom;
+
+	            // Perform bilinear interpolation to advect color
+	            Color color = (newCol[y0][x0].multiply(yFromTop).add(newCol[y1][x0].multiply(yFromBottom)))
+	                    .multiply(xFromRight)
+	                    .add((newCol[y0][x1].multiply(yFromTop).add(newCol[y1][x1].multiply(yFromBottom)))
+	                            .multiply(xFromLeft));
+	            
+	            // Update the color field with the advected color
+	            oldCol[i][j] = color;
+	        }
+	    }
+	    
+	    // Apply boundary conditions to the advected color field
+	    oldCol = setBndCol(oldCol);
+	    
+	    return oldCol;
 	}
 
 	BufferedImage createImg(BufferedImage im) {
+		//Creating Image variable
 		BufferedImage i = new BufferedImage(im.getWidth(), im.getHeight(), im.getType());
+		
+		//Scaling pixels and adding colors to image
 		for (int y = 0; y < drawW; y++) {
 			for (int x = 0; x < drawH; x++) {
 				i.setRGB(x, y, s[(int) (y / drawSize) + crop][(int) (x / drawSize) + crop].clampToInt());
@@ -449,72 +570,83 @@ public class Fluid extends JPanel {
 		newV = project(newV);
 		v = advectVec(v, newV);
 		v = project(v);
-//		setBndVec(newV);
-//		setBndVec(v);
 		newS = diffCol(newS, s);
 		s = advectCol(v, s, newS);
 		fade();
 	}
 
+	// Main loop of the fluid simulation
 	void loop(float tps) {
-
-		long oldTime = System.currentTimeMillis();
-		ms = 1000f / tps / steps;
-		float delta = 0, paintDelta = 0;
-		int frame = 0;
-		float rTP = 4;
-		float gTP = 4;
-		float bTP = 4;
-		float rPhase = rTP;
-		float gPhase = gTP;
-		float bPhase = bTP;
-		float rDenom = tps / steps / rTP;
-		float gDenom = tps / steps / gTP;
-		float bDenom = tps / steps / bTP;
-		while (running) {
-			long now = System.currentTimeMillis();
-			delta += (now - oldTime) / ms;
-			oldTime = now;
-			try {
-				Thread.sleep((int) (ms / 4));
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			if (delta >= 1) {
-				if (changeCol) {
-					System.out.println("Color changing");
-					rTP = 4 * r.nextFloat();
-					gTP = 4 * r.nextFloat();
-					bTP = 4 * r.nextFloat();
-					rPhase = rTP * r.nextFloat();
-					gPhase = gTP * r.nextFloat();
-					bPhase = bTP * r.nextFloat();
-					rDenom = tps / steps / rTP;
-					gDenom = tps / steps / gTP;
-					bDenom = tps / steps / bTP;
-					changeCol = false;
-				}
-				delta--;
-				// CODE AFTER THIS
-				tick();
-				frame++;
-				paintDelta++;
-				dyeCol = new Color((float) Math.sin(Math.PI * (frame / rDenom + rPhase)),
-						(float) Math.sin(Math.PI * (frame / gDenom + gPhase)),
-						(float) Math.sin(Math.PI * (frame / bDenom + bPhase)));
-				dyeCol = Color.clamp(0.004f, dyeCol, 4);
-				if (paintDelta >= steps) {
-					img = createImg(img);
-					this.repaint();
-					paintDelta = 0;
-				}
-				// CODE BEFORE THIS
-			}
-		}
+	    long oldTime = System.currentTimeMillis();
+	    ms = 1000f / tps;
+	    float delta = 0, paintDelta = 0;
+	    int frame = 0;
+	    float rTP = 4;
+	    float gTP = 4;
+	    float bTP = 4;
+	    float rPhase = 0;
+	    float gPhase = 1.333f;
+	    float bPhase = 2.666f;
+	    float rDenom = tps / rTP;
+	    float gDenom = tps / gTP;
+	    float bDenom = tps / bTP;
+	    
+	    // Main simulation loop
+	    while (running) {
+	        long now = System.currentTimeMillis();
+	        delta += (now - oldTime) / ms;
+	        oldTime = now;
+	        
+	        // Sleep for a short period to control simulation speed
+	        try {
+	            Thread.sleep((int) (ms / 4));
+	        } catch (InterruptedException e) {
+	            e.printStackTrace();
+	        }
+	        
+	        if (delta >= 1) {
+	            if (changeCol) {
+	                System.out.println("Color changing");
+	                // Generate new color phase parameters
+	                rTP = 4 * r.nextFloat();
+	                gTP = 4 * r.nextFloat();
+	                bTP = 4 * r.nextFloat();
+	                rPhase = rTP * r.nextFloat();
+	                gPhase = gTP * r.nextFloat();
+	                bPhase = bTP * r.nextFloat();
+	                rDenom = tps / rTP;
+	                gDenom = tps / gTP;
+	                bDenom = tps / bTP;
+	                changeCol = false;
+	            }
+	            delta--;
+	            
+	            // Simulate a time step
+	            tick();
+	            frame++;
+	            paintDelta++;
+	            
+	            // Update the dye color based on a sinusoidal function
+	            dyeCol = new Color((float) (Math.sin(Math.PI * (frame / rDenom + rPhase)) + .5f),
+	                    (float) (Math.sin(Math.PI * (frame / gDenom + gPhase)) + .5f),
+	                    (float) (Math.sin(Math.PI * (frame / bDenom + bPhase)) + .5f));
+	            dyeCol = Color.clamp(0, dyeCol, 4);
+	            
+	            if (paintDelta >= 1) {
+	                // Update the displayed image
+	                img = createImg(img);
+	                this.repaint();
+	                paintDelta = 0;
+	            }
+	        }
+	    }
 	}
 
 	public void paintComponent(Graphics g) {
+		//Draw main color grid
 		g.drawImage(img, 0, 0, iObs);
+		
+		//Draw velocity vectors
 		if (vectorView) {
 			for (int i = crop; i < (s.length - crop); i++) {
 				for (int j = crop; j < (s[1].length - crop); j++) {
@@ -534,7 +666,7 @@ public class Fluid extends JPanel {
 	}
 
 	public static void main(String[] args) {
-		Fluid fl = new Fluid(148, 5, 1f / 1e9f, 1f / 5e8f, 30, 1f / 1000f, false);
+		Fluid fl = new Fluid(148, 5, 1f / 1e9f, 1f / 5e8f, 30, 4f / 1000f, false);
 		fl.loop(fl.tps);
 		System.exit(0);
 	}
