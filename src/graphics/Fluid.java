@@ -28,9 +28,9 @@ public class Fluid extends JPanel {
 	BufferedImage img;
 	public static ImageObserver iObs;
 
-	int size = 72;
+	int size = 102;
 	static final int crop = 1;
-	int drawSize = 10;
+	int drawSize = 8;
 	int upResFac = 1;
 	float halfSize = drawSize / 2f;
 	static final int iter = 4;
@@ -283,7 +283,7 @@ public class Fluid extends JPanel {
 	}
 
 	Color[][] setBndCol(Color[][] col) {
-	    Color x, y;
+//	    Color x, y;
 
 	    // Set boundary values for top and bottom rows (excluding corners)
 	    for (int i = 1; i < size - 1; i++) {
