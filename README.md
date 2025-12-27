@@ -8,6 +8,7 @@ This is a real-time, grid-based 2D fluid simulation. Dragging the mouse injects 
 ## Demo
 
 YouTube: https://www.youtube.com/watch?v=aPf_i_lAKT4
+![Fluid simulation demo](/assets/demo.gif)
 
 ## Controls
 
